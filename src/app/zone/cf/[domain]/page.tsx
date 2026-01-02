@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Cloud, Globe, Activity, Database, Shield, TrendingUp, Zap, Clock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatBytes, formatNumber } from "@/lib/utils";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
@@ -100,6 +103,31 @@ export default function CFZoneDetailPage() {
       .slice(0, 15);
   }, [zone]);
 
+  const browserData = useMemo(() => {
+    if (!zone?.browsers || !Array.isArray(zone.browsers)) return [];
+    return zone.browsers as { name: string; pageViews: number }[];
+  }, [zone]);
+
+  const statusCodeData = useMemo(() => {
+    if (!zone?.statusCodes || !Array.isArray(zone.statusCodes)) return [];
+    return zone.statusCodes as { name: string; requests: number }[];
+  }, [zone]);
+
+  const contentTypeData = useMemo(() => {
+    if (!zone?.contentTypes || !Array.isArray(zone.contentTypes)) return [];
+    return zone.contentTypes as { name: string; bytes: number; requests: number }[];
+  }, [zone]);
+
+  const sslData = useMemo(() => {
+    if (!zone?.sslVersions || !Array.isArray(zone.sslVersions)) return [];
+    return zone.sslVersions as { name: string; requests: number }[];
+  }, [zone]);
+
+  const httpData = useMemo(() => {
+    if (!zone?.httpVersions || !Array.isArray(zone.httpVersions)) return [];
+    return zone.httpVersions as { name: string; requests: number }[];
+  }, [zone]);
+
   const stats = useMemo(() => {
     if (!zone?.raw) return { totalRequests: 0, totalBytes: 0, totalThreats: 0, cacheRate: 0, cachedBytes: 0, cachedRequests: 0 };
     
@@ -124,8 +152,31 @@ export default function CFZoneDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto flex h-14 sm:h-16 items-center gap-4 px-3 sm:px-4 max-w-7xl">
+            <Skeleton className="h-8 w-8 rounded" />
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </header>
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-7xl">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+            {[...Array(8)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 sm:p-6">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-8 w-24" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Skeleton className="h-10 w-full max-w-xl" />
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <Skeleton className="h-[250px] sm:h-[300px] w-full" />
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }
@@ -142,128 +193,135 @@ export default function CFZoneDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="container flex h-16 items-center gap-4 px-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="container mx-auto flex h-14 sm:h-16 items-center gap-2 sm:gap-4 px-3 sm:px-4 max-w-7xl">
+          <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-10 sm:w-10" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
-          <div className="flex items-center gap-2">
-            <Cloud className="h-6 w-6 text-cloudflare-orange" />
-            <h1 className="text-xl font-bold">{domain}</h1>
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Cloud className="h-5 w-5 sm:h-6 sm:w-6 text-cloudflare-orange flex-shrink-0" />
+            <h1 className="text-base sm:text-xl font-bold truncate">{domain}</h1>
           </div>
+          <Badge variant="info" className="flex-shrink-0">Cloudflare</Badge>
         </div>
       </header>
 
-      <main className="container px-4 py-6 space-y-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-7xl">
         {/* Overview Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-orange-500/20">
-                <Activity className="h-6 w-6 text-orange-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-orange-500/20">
+                <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">总请求数</p>
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{formatNumber(stats.totalRequests)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-orange-600 dark:text-orange-400">{formatNumber(stats.totalRequests)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-blue-500/20">
-                <Database className="h-6 w-6 text-blue-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-blue-500/20">
+                <Database className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">总流量</p>
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{formatBytes(stats.totalBytes)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{formatBytes(stats.totalBytes)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-red-500/10 to-red-600/5 border-red-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-red-500/20">
-                <Shield className="h-6 w-6 text-red-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-red-500/20">
+                <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-red-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">威胁拦截</p>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatNumber(stats.totalThreats)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-red-600 dark:text-red-400">{formatNumber(stats.totalThreats)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-green-500/20">
-                <TrendingUp className="h-6 w-6 text-green-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-green-500/20">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-green-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">缓存命中率</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.cacheRate.toFixed(1)}%</p>
+                <p className="text-lg sm:text-2xl font-bold text-green-600 dark:text-green-400">{stats.cacheRate.toFixed(1)}%</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Overview Cards - Row 2 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
           <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-purple-500/20">
-                <Database className="h-6 w-6 text-purple-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-purple-500/20">
+                <Database className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">缓存流量</p>
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatBytes(stats.cachedBytes)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{formatBytes(stats.cachedBytes)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-cyan-500/20">
-                <Zap className="h-6 w-6 text-cyan-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-cyan-500/20">
+                <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">缓存请求</p>
-                <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatNumber(stats.cachedRequests)}</p>
+                <p className="text-lg sm:text-2xl font-bold text-cyan-600 dark:text-cyan-400">{formatNumber(stats.cachedRequests)}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border-indigo-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-indigo-500/20">
-                <Globe className="h-6 w-6 text-indigo-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-indigo-500/20">
+                <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">访问国家</p>
-                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{geoData.length}</p>
+                <p className="text-lg sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{geoData.length}</p>
               </div>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-pink-500/10 to-pink-600/5 border-pink-500/20">
-            <CardContent className="flex items-center gap-4 p-6">
-              <div className="rounded-full p-3 bg-pink-500/20">
-                <Clock className="h-6 w-6 text-pink-500" />
+            <CardContent className="flex items-center gap-3 sm:gap-4 p-4 sm:p-6">
+              <div className="rounded-full p-2 sm:p-3 bg-pink-500/20">
+                <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-pink-500" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">数据天数</p>
-                <p className="text-2xl font-bold text-pink-600 dark:text-pink-400">{zone?.raw?.length || 0} 天</p>
+                <p className="text-lg sm:text-2xl font-bold text-pink-600 dark:text-pink-400">{zone?.raw?.length || 0} 天</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="hourly" className="space-y-4">
-          <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
-            <TabsTrigger value="hourly" className="data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">小时趋势</TabsTrigger>
-            <TabsTrigger value="daily" className="data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">每日趋势</TabsTrigger>
-            <TabsTrigger value="geography" className="data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">地区分布</TabsTrigger>
-            <TabsTrigger value="cache" className="data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">缓存分析</TabsTrigger>
-            <TabsTrigger value="threats" className="data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">威胁分析</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="hourly" className="space-y-3 sm:space-y-4">
+          <ScrollArea className="w-full">
+            <TabsList className="inline-flex h-auto gap-1 bg-muted/50 p-1 w-max min-w-full">
+              <TabsTrigger value="hourly" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">小时趋势</TabsTrigger>
+              <TabsTrigger value="daily" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">每日趋势</TabsTrigger>
+              <TabsTrigger value="geography" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">地区分布</TabsTrigger>
+              <TabsTrigger value="cache" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">缓存分析</TabsTrigger>
+              <TabsTrigger value="threats" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">威胁分析</TabsTrigger>
+              <TabsTrigger value="browser" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">浏览器</TabsTrigger>
+              <TabsTrigger value="status" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">状态码</TabsTrigger>
+              <TabsTrigger value="content" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">内容类型</TabsTrigger>
+              <TabsTrigger value="protocol" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">协议版本</TabsTrigger>
+            </TabsList>
+          </ScrollArea>
 
           <TabsContent value="hourly" className="space-y-4">
             <Card>
               <CardHeader><CardTitle>请求趋势 (72h)</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trafficData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -279,7 +337,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>流量趋势 (72h)</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trafficData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -299,7 +357,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>每日请求趋势</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailyData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -315,7 +373,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>每日流量趋势</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailyData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -334,7 +392,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>访问地区 TOP 15</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[500px]">
+                <div className="h-[350px] sm:h-[500px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={geoData} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" />
@@ -354,7 +412,7 @@ export default function CFZoneDetailPage() {
               <Card>
                 <CardHeader><CardTitle>缓存流量趋势</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="h-[300px]">
+                  <div className="h-[300px] sm:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={trafficData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -371,7 +429,7 @@ export default function CFZoneDetailPage() {
               <Card>
                 <CardHeader><CardTitle>每日缓存对比</CardTitle></CardHeader>
                 <CardContent>
-                  <div className="h-[300px]">
+                  <div className="h-[300px] sm:h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={dailyData}>
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -392,7 +450,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>威胁拦截趋势</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trafficData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -408,7 +466,7 @@ export default function CFZoneDetailPage() {
             <Card>
               <CardHeader><CardTitle>每日威胁统计</CardTitle></CardHeader>
               <CardContent>
-                <div className="h-[300px]">
+                <div className="h-[300px] sm:h-[400px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailyData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -421,6 +479,121 @@ export default function CFZoneDetailPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="browser">
+            <Card>
+              <CardHeader><CardTitle>浏览器分布 TOP 10</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {browserData.length > 0 ? browserData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className="text-sm truncate">{item.name || "Unknown"}</p>
+                        <div className="h-2 bg-muted rounded-full mt-1">
+                          <div className="h-full bg-cloudflare-orange rounded-full" style={{ width: `${(item.pageViews / (browserData[0]?.pageViews || 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatNumber(item.pageViews)} PV</span>
+                    </div>
+                  )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="status">
+            <Card>
+              <CardHeader><CardTitle>状态码分布 TOP 10</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {statusCodeData.length > 0 ? statusCodeData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-mono">{item.name}</p>
+                        <div className="h-2 bg-muted rounded-full mt-1">
+                          <div 
+                            className="h-full rounded-full" 
+                            style={{ 
+                              width: `${(item.requests / (statusCodeData[0]?.requests || 1)) * 100}%`,
+                              backgroundColor: item.name.startsWith('2') ? '#10B981' : item.name.startsWith('3') ? '#3B82F6' : item.name.startsWith('4') ? '#F59E0B' : '#EF4444'
+                            }} 
+                          />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatNumber(item.requests)}</span>
+                    </div>
+                  )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="content">
+            <Card>
+              <CardHeader><CardTitle>内容类型分布 TOP 10</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {contentTypeData.length > 0 ? contentTypeData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-mono truncate">{item.name || "Unknown"}</p>
+                        <div className="h-2 bg-muted rounded-full mt-1">
+                          <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(item.bytes / (contentTypeData[0]?.bytes || 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatBytes(item.bytes)}</span>
+                    </div>
+                  )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="protocol" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader><CardTitle>SSL/TLS 版本</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {sslData.length > 0 ? sslData.map((item, i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-mono">{item.name || "Unknown"}</p>
+                          <div className="h-2 bg-muted rounded-full mt-1">
+                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${(item.requests / (sslData[0]?.requests || 1)) * 100}%` }} />
+                          </div>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{formatNumber(item.requests)}</span>
+                      </div>
+                    )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>HTTP 版本</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {httpData.length > 0 ? httpData.map((item, i) => (
+                      <div key={i} className="flex items-center gap-4">
+                        <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-mono">{item.name || "Unknown"}</p>
+                          <div className="h-2 bg-muted rounded-full mt-1">
+                            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(item.requests / (httpData[0]?.requests || 1)) * 100}%` }} />
+                          </div>
+                        </div>
+                        <span className="text-sm text-muted-foreground">{formatNumber(item.requests)}</span>
+                      </div>
+                    )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>

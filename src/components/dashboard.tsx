@@ -31,6 +31,9 @@ import { StatsCards } from "./stats-cards";
 import { TrafficChart } from "./traffic-chart";
 import { GeographyStats } from "./geography-stats";
 import { formatBytes, formatNumber } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CFAnalyticsData, EOZone, TimePeriod } from "@/types";
 
 export function Dashboard() {
@@ -46,7 +49,7 @@ export function Dashboard() {
   const [cfData, setCfData] = useState<CFAnalyticsData | null>(null);
   // Cloudflare Workers data
   const [workersData, setWorkersData] = useState<{
-    accounts: { account: string; workers: { scriptName: string; requests: number; errors: number; cpuTimeP50: number; cpuTimeP99: number }[]; totalRequests: number; totalErrors: number }[];
+    accounts: { account: string; workers: { scriptName: string; requests: number; errors: number; subrequests: number; cpuTimeP50: number; cpuTimeP99: number }[]; totalRequests: number; totalErrors: number }[];
     totalRequests: number;
     totalErrors: number;
   } | null>(null);
@@ -147,11 +150,34 @@ export function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">{t("loading")}</p>
-        </div>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+          <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 max-w-7xl">
+            <Skeleton className="h-6 w-32" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-24 hidden sm:block" />
+              <Skeleton className="h-8 w-8 rounded" />
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-7xl">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-4 sm:p-6">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-8 w-24" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Skeleton className="h-10 w-full max-w-md" />
+          <Card>
+            <CardContent className="p-4 sm:p-6">
+              <Skeleton className="h-[250px] sm:h-[300px] w-full" />
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }
@@ -160,30 +186,47 @@ export function Dashboard() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Cloud className="h-6 w-6 text-cloudflare-orange" />
-              <Zap className="h-5 w-5 text-edgeone-blue" />
+        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 max-w-7xl">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Cloud className="h-5 w-5 sm:h-6 sm:w-6 text-cloudflare-orange" />
+              <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-edgeone-blue" />
             </div>
-            <h1 className="text-xl font-bold">{t("dashboardTitle")}</h1>
+            <h1 className="text-base sm:text-xl font-bold">{t("dashboardTitle")}</h1>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Period Selector */}
-            <div className="flex rounded-lg border bg-muted p-1">
-              {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
-                <Button
-                  key={period}
-                  variant={selectedPeriod === period ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setSelectedPeriod(period)}
-                  className="px-3"
-                >
-                  {t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays")}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* Period Selector - Hidden on mobile, shown in dropdown */}
+            <ScrollArea className="max-w-[200px] sm:max-w-none hidden sm:block">
+              <div className="flex rounded-lg border bg-muted p-1">
+                {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
+                  <Button
+                    key={period}
+                    variant={selectedPeriod === period ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setSelectedPeriod(period)}
+                    className="px-2 sm:px-3 text-xs sm:text-sm"
+                  >
+                    {t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays")}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+            {/* Mobile period selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild className="sm:hidden">
+                <Button variant="outline" size="sm" className="text-xs">
+                  {t(selectedPeriod === "1day" ? "singleDay" : selectedPeriod === "3days" ? "threeDays" : selectedPeriod === "7days" ? "sevenDays" : "thirtyDays")}
                 </Button>
-              ))}
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
+                  <DropdownMenuItem key={period} onClick={() => setSelectedPeriod(period)}>
+                    {t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays")}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Refresh */}
             <Button variant="outline" size="icon" onClick={fetchData}>
@@ -223,12 +266,12 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="container px-4 py-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
         {error && (
-          <Card className="mb-6 border-destructive">
-            <CardContent className="flex items-center justify-between p-4">
-              <p className="text-destructive">{error}</p>
-              <Button variant="outline" onClick={fetchData}>
+          <Card className="mb-4 sm:mb-6 border-destructive">
+            <CardContent className="flex items-center justify-between p-3 sm:p-4">
+              <p className="text-destructive text-sm sm:text-base">{error}</p>
+              <Button variant="outline" size="sm" onClick={fetchData}>
                 {t("retry")}
               </Button>
             </CardContent>
@@ -237,37 +280,40 @@ export function Dashboard() {
 
         {!hasCfData && !hasEoData ? (
           <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Globe className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h2 className="mb-2 text-xl font-semibold">{t("noData")}</h2>
-              <p className="text-center text-muted-foreground">{t("configureToken")}</p>
+            <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12">
+              <Globe className="mb-4 h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
+              <h2 className="mb-2 text-lg sm:text-xl font-semibold">{t("noData")}</h2>
+              <p className="text-center text-sm sm:text-base text-muted-foreground">{t("configureToken")}</p>
             </CardContent>
           </Card>
         ) : (
           <>
             {/* Provider Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="mb-6">
-              <TabsList className="grid w-full max-w-md grid-cols-3">
-                <TabsTrigger value="all" className="flex items-center gap-2">
-                  <Activity className="h-4 w-4" />
-                  {t("dashboardTitle")}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="mb-4 sm:mb-6">
+              <TabsList className="grid w-full max-w-md grid-cols-3 h-auto">
+                <TabsTrigger value="all" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
+                  <Activity className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">{t("dashboardTitle")}</span>
+                  <span className="xs:hidden">全部</span>
                 </TabsTrigger>
-                <TabsTrigger value="cloudflare" className="flex items-center gap-2" disabled={!hasCfData}>
-                  <Cloud className="h-4 w-4 text-cloudflare-orange" />
-                  Cloudflare
+                <TabsTrigger value="cloudflare" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2" disabled={!hasCfData}>
+                  <Cloud className="h-3 w-3 sm:h-4 sm:w-4 text-cloudflare-orange" />
+                  <span className="hidden sm:inline">Cloudflare</span>
+                  <span className="sm:hidden">CF</span>
                 </TabsTrigger>
-                <TabsTrigger value="edgeone" className="flex items-center gap-2" disabled={!hasEoData}>
-                  <Zap className="h-4 w-4 text-edgeone-blue" />
-                  EdgeOne
+                <TabsTrigger value="edgeone" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2" disabled={!hasEoData}>
+                  <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-edgeone-blue" />
+                  <span className="hidden sm:inline">EdgeOne</span>
+                  <span className="sm:hidden">EO</span>
                 </TabsTrigger>
               </TabsList>
 
               {/* All Tab - Combined View */}
-              <TabsContent value="all" className="space-y-6">
+              <TabsContent value="all" className="space-y-4 sm:space-y-6">
                 {/* Combined Stats Overview */}
-                <div className="mb-4">
-                  <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                    <Activity className="h-5 w-5 text-primary" />
+                <div className="mb-3 sm:mb-4">
+                  <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 mb-3 sm:mb-4">
+                    <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                     全平台数据汇总
                   </h2>
                   <StatsCards
@@ -397,6 +443,16 @@ export function Dashboard() {
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">错误数</span>
                                   <span className={worker.errors > 0 ? "text-red-500 font-medium" : ""}>{formatNumber(worker.errors)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">子请求</span>
+                                  <span>{formatNumber(worker.subrequests || 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">成功率</span>
+                                  <span className={worker.requests > 0 && worker.errors / worker.requests > 0.01 ? "text-yellow-500" : "text-green-500"}>
+                                    {worker.requests > 0 ? ((1 - worker.errors / worker.requests) * 100).toFixed(2) : 100}%
+                                  </span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">CPU P50</span>
@@ -641,6 +697,16 @@ export function Dashboard() {
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">错误数</span>
                                   <span className={worker.errors > 0 ? "text-red-500 font-medium" : ""}>{formatNumber(worker.errors)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">子请求</span>
+                                  <span>{formatNumber(worker.subrequests || 0)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">成功率</span>
+                                  <span className={worker.requests > 0 && worker.errors / worker.requests > 0.01 ? "text-yellow-500" : "text-green-500"}>
+                                    {worker.requests > 0 ? ((1 - worker.errors / worker.requests) * 100).toFixed(2) : 100}%
+                                  </span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">CPU P50</span>

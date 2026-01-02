@@ -159,6 +159,28 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       }
     }`;
 
+  const clientQuery = `
+    query($zone: String!, $since: Date!, $until: Date!) {
+      viewer {
+        zones(filter: {zoneTag: $zone}) {
+          httpRequests1dGroups(
+            filter: {date_geq: $since, date_leq: $until}
+            limit: 100
+            orderBy: [date_DESC]
+          ) {
+            dimensions { date }
+            sum {
+              browserMap { pageViews uaBrowserFamily }
+              clientSSLMap { requests clientSSLProtocol }
+              clientHTTPVersionMap { requests clientHTTPProtocol }
+              responseStatusMap { requests edgeResponseStatus }
+              contentTypeMap { bytes requests edgeResponseContentTypeName }
+            }
+          }
+        }
+      }
+    }`;
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -171,7 +193,7 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
         signal: controller.signal,
       });
 
-    const [daysRes, hoursRes, geoRes] = await Promise.all([
+    const [daysRes, hoursRes, geoRes, clientRes] = await Promise.all([
       fetchWithTimeout(JSON.stringify({
         query: daysQuery,
         variables: { zone: zoneId, since: daysSince, until: daysUntil },
@@ -184,14 +206,19 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
         query: geoQuery,
         variables: { zone: zoneId, since: daysSince, until: daysUntil },
       })),
+      fetchWithTimeout(JSON.stringify({
+        query: clientQuery,
+        variables: { zone: zoneId, since: daysSince, until: daysUntil },
+      })),
     ]);
     
     clearTimeout(timeoutId);
 
-    const [daysData, hoursData, geoData] = await Promise.all([
+    const [daysData, hoursData, geoData, clientData] = await Promise.all([
       daysRes.json(),
       hoursRes.json(),
       geoRes.json(),
+      clientRes.json(),
     ]);
 
     const zoneData: {
@@ -199,12 +226,22 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       raw: unknown[];
       rawHours: unknown[];
       geography: unknown[];
+      browsers: unknown[];
+      statusCodes: unknown[];
+      contentTypes: unknown[];
+      sslVersions: unknown[];
+      httpVersions: unknown[];
       error?: string;
     } = {
       domain,
       raw: [],
       rawHours: [],
       geography: [],
+      browsers: [],
+      statusCodes: [],
+      contentTypes: [],
+      sslVersions: [],
+      httpVersions: [],
     };
 
     // Process days data
@@ -246,6 +283,61 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
         .slice(0, 15);
     }
 
+    // Process client data (browsers, status codes, content types, SSL, HTTP versions)
+    if (clientData.data?.viewer?.zones?.[0]?.httpRequests1dGroups) {
+      const rawClientData = clientData.data.viewer.zones[0].httpRequests1dGroups;
+      
+      const browserStats: Record<string, { name: string; pageViews: number }> = {};
+      const statusCodeStats: Record<string, { name: string; requests: number }> = {};
+      const contentTypeStats: Record<string, { name: string; bytes: number; requests: number }> = {};
+      const sslStats: Record<string, { name: string; requests: number }> = {};
+      const httpStats: Record<string, { name: string; requests: number }> = {};
+
+      rawClientData.forEach((record: any) => {
+        // Process browsers
+        record.sum?.browserMap?.forEach((b: any) => {
+          const name = b.uaBrowserFamily || "Unknown";
+          if (!browserStats[name]) browserStats[name] = { name, pageViews: 0 };
+          browserStats[name].pageViews += b.pageViews || 0;
+        });
+
+        // Process status codes
+        record.sum?.responseStatusMap?.forEach((s: any) => {
+          const name = String(s.edgeResponseStatus);
+          if (!statusCodeStats[name]) statusCodeStats[name] = { name, requests: 0 };
+          statusCodeStats[name].requests += s.requests || 0;
+        });
+
+        // Process content types
+        record.sum?.contentTypeMap?.forEach((c: any) => {
+          const name = c.edgeResponseContentTypeName || "Unknown";
+          if (!contentTypeStats[name]) contentTypeStats[name] = { name, bytes: 0, requests: 0 };
+          contentTypeStats[name].bytes += c.bytes || 0;
+          contentTypeStats[name].requests += c.requests || 0;
+        });
+
+        // Process SSL versions
+        record.sum?.clientSSLMap?.forEach((ssl: any) => {
+          const name = ssl.clientSSLProtocol || "Unknown";
+          if (!sslStats[name]) sslStats[name] = { name, requests: 0 };
+          sslStats[name].requests += ssl.requests || 0;
+        });
+
+        // Process HTTP versions
+        record.sum?.clientHTTPVersionMap?.forEach((http: any) => {
+          const name = http.clientHTTPProtocol || "Unknown";
+          if (!httpStats[name]) httpStats[name] = { name, requests: 0 };
+          httpStats[name].requests += http.requests || 0;
+        });
+      });
+
+      zoneData.browsers = Object.values(browserStats).sort((a, b) => b.pageViews - a.pageViews).slice(0, 10);
+      zoneData.statusCodes = Object.values(statusCodeStats).sort((a, b) => b.requests - a.requests).slice(0, 10);
+      zoneData.contentTypes = Object.values(contentTypeStats).sort((a, b) => b.bytes - a.bytes).slice(0, 10);
+      zoneData.sslVersions = Object.values(sslStats).sort((a, b) => b.requests - a.requests);
+      zoneData.httpVersions = Object.values(httpStats).sort((a, b) => b.requests - a.requests);
+    }
+
     return zoneData;
   } catch (error) {
     console.error(`Zone ${domain} fetch error:`, error);
@@ -254,6 +346,11 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       raw: [],
       rawHours: [],
       geography: [],
+      browsers: [],
+      statusCodes: [],
+      contentTypes: [],
+      sslVersions: [],
+      httpVersions: [],
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }

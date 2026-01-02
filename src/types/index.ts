@@ -4,6 +4,11 @@ export interface CFZone {
   raw: CFDayData[];
   rawHours: CFHourData[];
   geography: CFGeoData[];
+  browsers?: { name: string; pageViews: number }[];
+  statusCodes?: { name: string; requests: number }[];
+  contentTypes?: { name: string; bytes: number; requests: number }[];
+  sslVersions?: { name: string; requests: number }[];
+  httpVersions?: { name: string; requests: number }[];
   error?: string;
 }
 

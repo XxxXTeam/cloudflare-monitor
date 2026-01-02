@@ -1,7 +1,0 @@
-{
-  "name": "nextjs-template",
-  "installCommand": "pnpm install",
-  "assets": {
-    "directory": "./next"
-  }
-}

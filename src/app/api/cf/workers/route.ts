@@ -74,6 +74,54 @@ interface WorkerStats {
   cpuTimeP99: number;
 }
 
+interface WorkerQuota {
+  dailyRequestLimit: number;
+  dailyRequestUsed: number;
+  cpuTimeLimit: number;
+  plan: string;
+}
+
+async function fetchWorkersQuota(
+  headers: HeadersInit,
+  accountId: string
+): Promise<WorkerQuota | null> {
+  try {
+    // Fetch account subscription info to get Workers plan
+    const subRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/subscriptions`, {
+      headers,
+    });
+    const subData = await subRes.json();
+    
+    let plan = "free";
+    let dailyRequestLimit = 100000; // Free plan default
+    let cpuTimeLimit = 10; // 10ms for free plan
+
+    if (subData.result) {
+      const workersSub = subData.result.find((s: any) => 
+        s.product?.name?.toLowerCase().includes("worker") || 
+        s.component_values?.some((c: any) => c.name?.toLowerCase().includes("worker"))
+      );
+      if (workersSub) {
+        plan = workersSub.rate_plan?.id || "free";
+        if (plan.includes("paid") || plan.includes("bundled") || plan.includes("unlimited")) {
+          dailyRequestLimit = 10000000; // Paid plan
+          cpuTimeLimit = 50; // 50ms for paid plan
+        }
+      }
+    }
+
+    return {
+      dailyRequestLimit,
+      dailyRequestUsed: 0, // Will be calculated from analytics
+      cpuTimeLimit,
+      plan,
+    };
+  } catch (error) {
+    console.error("Workers quota error:", error);
+    return null;
+  }
+}
+
 async function fetchWorkersAnalytics(
   headers: HeadersInit,
   accountId: string,
@@ -169,7 +217,7 @@ export async function GET(request: NextRequest) {
     const startTime = yesterday.toISOString();
     const endTime = now.toISOString();
 
-    const allWorkers: { account: string; workers: WorkerStats[]; totalRequests: number; totalErrors: number }[] = [];
+    const allWorkers: { account: string; workers: WorkerStats[]; totalRequests: number; totalErrors: number; quota?: WorkerQuota | null }[] = [];
 
     for (const config of accountConfigs) {
       const headers = {
@@ -188,23 +236,36 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      const workers = await fetchWorkersAnalytics(headers, accountId, startTime, endTime);
+      const [workers, quota] = await Promise.all([
+        fetchWorkersAnalytics(headers, accountId, startTime, endTime),
+        fetchWorkersQuota(headers, accountId),
+      ]);
       
       const totalRequests = workers.reduce((sum, w) => sum + w.requests, 0);
       const totalErrors = workers.reduce((sum, w) => sum + w.errors, 0);
+
+      // Update quota with actual usage
+      if (quota) {
+        quota.dailyRequestUsed = totalRequests;
+      }
 
       allWorkers.push({
         account: config.name,
         workers,
         totalRequests,
         totalErrors,
+        quota,
       });
     }
 
+    const totalRequests = allWorkers.reduce((sum, a) => sum + a.totalRequests, 0);
+    const totalErrors = allWorkers.reduce((sum, a) => sum + a.totalErrors, 0);
+
     return NextResponse.json({ 
       accounts: allWorkers,
-      totalRequests: allWorkers.reduce((sum, a) => sum + a.totalRequests, 0),
-      totalErrors: allWorkers.reduce((sum, a) => sum + a.totalErrors, 0),
+      totalRequests,
+      totalErrors,
+      totalWorkers: allWorkers.reduce((sum, a) => sum + a.workers.length, 0),
     });
   } catch (error) {
     console.error("Workers API error:", error);

@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const allAccounts: { name: string; Zones: unknown[]; overview?: { totalFlux: number; totalRequests: number; totalBandwidth: number; totalHits: number } }[] = [];
+    const allAccounts: { name: string; Zones: unknown[]; overview?: { totalFlux: number; totalRequests: number; totalBandwidth: number; totalHits: number }; edgeFunctions?: { totalRequests: number; totalCpuTime: number } }[] = [];
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const startTime = yesterday.toISOString().slice(0, 19) + "Z";
@@ -210,6 +210,63 @@ export async function GET(request: NextRequest) {
         console.error("Failed to fetch overview traffic data:", err);
       }
 
+      // Fetch Edge Functions usage data
+      let edgeFunctionsData = {
+        totalRequests: 0,
+        totalCpuTime: 0,
+      };
+
+      try {
+        const [efRequestData, efCpuData] = await Promise.all([
+          callTencentAPI(
+            "DescribeTimingL7AnalysisData",
+            {
+              StartTime: startTime,
+              EndTime: endTime,
+              MetricNames: ["edgeFunction_request"],
+              ZoneIds: ["*"],
+              Interval: "hour",
+            },
+            config.secretId,
+            config.secretKey
+          ),
+          callTencentAPI(
+            "DescribeTimingL7AnalysisData",
+            {
+              StartTime: startTime,
+              EndTime: endTime,
+              MetricNames: ["edgeFunction_cpuTime"],
+              ZoneIds: ["*"],
+              Interval: "hour",
+            },
+            config.secretId,
+            config.secretKey
+          ),
+        ]);
+
+        // Parse Edge Functions request data
+        const efReqArr = efRequestData.Response?.Data || efRequestData.Data || [];
+        efReqArr.forEach((item: { TypeValue?: Array<{ Detail?: Array<{ Value: number }> }> }) => {
+          item.TypeValue?.forEach((tv) => {
+            tv.Detail?.forEach((d) => {
+              edgeFunctionsData.totalRequests += d.Value || 0;
+            });
+          });
+        });
+
+        // Parse Edge Functions CPU time data
+        const efCpuArr = efCpuData.Response?.Data || efCpuData.Data || [];
+        efCpuArr.forEach((item: { TypeValue?: Array<{ Detail?: Array<{ Value: number }> }> }) => {
+          item.TypeValue?.forEach((tv) => {
+            tv.Detail?.forEach((d) => {
+              edgeFunctionsData.totalCpuTime += d.Value || 0;
+            });
+          });
+        });
+      } catch (err) {
+        console.error("Failed to fetch Edge Functions data:", err);
+      }
+
       // 为每个站点添加基本信息
       const zonesWithTraffic = zones.slice(0, 10).map((zone: { ZoneId: string; ZoneName: string; Status: string; ActiveStatus?: string }) => ({
         ...zone,
@@ -222,6 +279,7 @@ export async function GET(request: NextRequest) {
           name: config.name,
           Zones: zonesWithTraffic,
           overview: overviewData,
+          edgeFunctions: edgeFunctionsData,
         });
       }
     }

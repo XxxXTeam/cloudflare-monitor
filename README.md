@@ -7,6 +7,7 @@
 - 📊 **多 CDN 平台支持**
   - Cloudflare 完整支持（包括 Workers 监控）
   - EdgeOne（腾讯云 CDN）支持
+  - Aliyun ESA 支持（站点列表 + 配额使用）
   
 - 🔐 **多账户管理**
   - 支持 Cloudflare 多账户配置
@@ -178,6 +179,7 @@ docker run -p 3000:3000 --env-file .env.local cdn-monitor
 - `/api/cf/workers` - Cloudflare Workers 数据
 - `/api/eo/zones` - EdgeOne 站点列表
 - `/api/eo/traffic` - EdgeOne 流量数据
+- `/api/esa` - Aliyun ESA 站点与配额数据
 
 ## 🔧 开发指南
 

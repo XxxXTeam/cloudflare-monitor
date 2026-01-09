@@ -139,3 +139,85 @@ export interface ChartDataPoint {
   threats?: number;
   cached?: number;
 }
+
+// Aliyun ESA Types
+export interface ESASite {
+  SiteId: string;
+  SiteName: string;
+  Status?: string;
+  DomainCount?: number;
+  Type?: string;
+  Coverage?: string;
+  CnameStatus?: string;
+  Area?: string;
+  AccessType?: string;
+  PlanType?: string;
+  InstanceId?: string;
+  Traffic?: {
+    requests: number;
+    bytes: number;
+  };
+  requests?: number;
+  bytes?: number;
+}
+
+export interface ESAQuota {
+  quotaName: string;
+  total: number;
+  used: number;
+}
+
+export interface ESARoutine {
+  name: string;
+  description?: string;
+  codeVersion?: string;
+  status?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface ESAEdgeRoutinePlan {
+  PlanName?: string;
+  RequestQuota?: number;
+  RequestUsed?: number;
+  CpuTimeQuota?: number;
+  CpuTimeUsed?: number;
+  Status?: string;
+}
+
+export interface ESAErService {
+  Status?: string;
+  PlanName?: string;
+  RequestQuota?: number;
+  RequestUsed?: number;
+  CpuTimeQuota?: number;
+  CpuTimeUsed?: number;
+}
+
+export interface ESAAccount {
+  name: string;
+  sites: ESASite[];
+  quotas: ESAQuota[];
+  totalRequests: number;
+  totalBytes: number;
+  instanceId?: string;
+  quotaSource?: string;
+  routines?: ESARoutine[];
+  routineCount?: number;
+  edgeRoutinePlans?: ESAEdgeRoutinePlan[];
+  erService?: ESAErService;
+}
+
+export interface ESAData {
+  accounts: ESAAccount[];
+}
+
+// CF Workers quota
+export interface CFWorkerQuota {
+  account: string;
+  plan?: string;
+  total?: number;
+  used?: number;
+  remaining?: number;
+  period?: string;
+}

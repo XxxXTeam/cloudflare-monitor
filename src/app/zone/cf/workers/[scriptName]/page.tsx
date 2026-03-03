@@ -4,17 +4,27 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Code, Activity, AlertTriangle, Cpu, Clock, Zap, TrendingUp, Server } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatNumber } from "@/lib/utils";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell
 } from "recharts";
 
 const COLORS = ["#10B981", "#3B82F6", "#F59E0B", "#EF4444", "#8B5CF6"];
+
+/*
+WORKER_TAB_ITEMS Workers 详情页标签项定义
+@功能 定义 Workers 详情页的所有标签页
+*/
+const WORKER_TAB_ITEMS = [
+  { value: "overview", label: "概览" },
+  { value: "quota", label: "配额使用" },
+  { value: "comparison", label: "Workers 对比" },
+];
 
 interface WorkerData {
   scriptName: string;
@@ -47,6 +57,7 @@ export default function WorkerDetailPage() {
   const [account, setAccount] = useState<AccountData | null>(null);
   const [allWorkers, setAllWorkers] = useState<{ account: string; worker: WorkerData }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     fetchWorkerData();
@@ -256,14 +267,13 @@ export default function WorkerDetailPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex h-auto gap-1 bg-muted/50 p-1 w-max min-w-full">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">概览</TabsTrigger>
-              <TabsTrigger value="quota" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">配额使用</TabsTrigger>
-              <TabsTrigger value="comparison" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">Workers 对比</TabsTrigger>
-            </TabsList>
-          </ScrollArea>
+        <ResponsiveTabs
+          tabs={WORKER_TAB_ITEMS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          accentColor="bg-cloudflare-orange"
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
 
           <TabsContent value="overview" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
@@ -447,7 +457,8 @@ export default function WorkerDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </ResponsiveTabs>
       </main>
     </div>
   );

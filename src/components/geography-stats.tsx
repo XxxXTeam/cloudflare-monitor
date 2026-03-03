@@ -1,16 +1,25 @@
 "use client";
 
 import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Globe } from "lucide-react";
 import type { CFAnalyticsData } from "@/types";
 
+/*
+GeographyStatsProps 地理分布统计组件属性
+@field data Cloudflare 分析数据
+@field formatNumber 数字格式化函数
+@field formatBytes 字节格式化函数
+*/
 interface GeographyStatsProps {
   data: CFAnalyticsData | null;
   formatNumber: (num: number) => string;
   formatBytes: (bytes: number) => string;
 }
 
+/*
+GeographyStats 访问地区排行榜组件
+@功能 展示 Cloudflare 站点的访问国家/地区 TOP 10 排行榜
+*/
 export function GeographyStats({ data, formatNumber, formatBytes }: GeographyStatsProps) {
   const geoData = useMemo(() => {
     if (!data?.accounts) return [];
@@ -50,39 +59,35 @@ export function GeographyStats({ data, formatNumber, formatBytes }: GeographySta
   const maxRequests = Math.max(...geoData.map((g) => g.requests));
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Globe className="h-5 w-5" />
-          访问国家/地区 TOP 10
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {geoData.map((geo, index) => (
-            <div key={geo.country} className="flex items-center gap-4">
-              <span className="w-6 text-center text-sm font-medium text-muted-foreground">
-                {index + 1}
-              </span>
-              <div className="flex-1">
-                <div className="mb-1 flex items-center justify-between text-sm">
-                  <span className="font-medium">{geo.country}</span>
-                  <div className="flex gap-4 text-muted-foreground">
-                    <span>{formatNumber(geo.requests)} 请求</span>
-                    <span>{formatBytes(geo.bytes)}</span>
-                  </div>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${(geo.requests / maxRequests) * 100}%` }}
-                  />
+    <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4 sm:mb-5">
+        <Globe className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-semibold">访问国家/地区 TOP 10</h3>
+      </div>
+      <div className="space-y-3 sm:space-y-3.5">
+        {geoData.map((geo, index) => (
+          <div key={geo.country} className="flex items-center gap-2.5 sm:gap-3">
+            <span className="w-5 text-center text-[11px] font-medium text-muted-foreground flex-shrink-0 tabular-nums">
+              {index + 1}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-xs sm:text-sm font-medium truncate">{geo.country}</span>
+                <div className="flex gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground flex-shrink-0 tabular-nums">
+                  <span className="hidden sm:inline">{formatNumber(geo.requests)} 请求</span>
+                  <span>{formatBytes(geo.bytes)}</span>
                 </div>
               </div>
+              <div className="h-1 sm:h-1.5 overflow-hidden rounded-full bg-muted/60">
+                <div
+                  className="h-full rounded-full bg-primary/70 transition-all"
+                  style={{ width: `${(geo.requests / maxRequests) * 100}%` }}
+                />
+              </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

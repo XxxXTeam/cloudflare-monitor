@@ -4,16 +4,27 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Shield, Globe, Activity, Database, TrendingUp, Code, Server, Clock, Zap, FileCode, Cpu } from "lucide-react";
 import { formatBytes, formatNumber } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import type { ESAData, ESASite, ESAAccount, ESARoutine } from "@/types";
+
+/*
+ESA_TAB_ITEMS ESA 站点详情页标签项定义
+@功能 定义 ESA 站点详情页的所有标签页
+*/
+const ESA_TAB_ITEMS = [
+  { value: "overview", label: "概览" },
+  { value: "routines", label: "边缘函数" },
+  { value: "traffic", label: "流量趋势" },
+];
 
 interface TrafficData {
   time: string;
@@ -29,6 +40,7 @@ export default function ESASiteDetailPage() {
   const [site, setSite] = useState<ESASite | null>(null);
   const [account, setAccount] = useState<ESAAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     fetchSiteData();
@@ -257,14 +269,13 @@ export default function ESASiteDetailPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="overview" className="space-y-3 sm:space-y-4">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex h-auto gap-1 bg-muted/50 p-1 w-max min-w-full">
-              <TabsTrigger value="overview" className="text-xs sm:text-sm data-[state=active]:bg-emerald-500 data-[state=active]:text-white">概览</TabsTrigger>
-              <TabsTrigger value="routines" className="text-xs sm:text-sm data-[state=active]:bg-emerald-500 data-[state=active]:text-white">边缘函数</TabsTrigger>
-              <TabsTrigger value="traffic" className="text-xs sm:text-sm data-[state=active]:bg-emerald-500 data-[state=active]:text-white">流量趋势</TabsTrigger>
-            </TabsList>
-          </ScrollArea>
+        <ResponsiveTabs
+          tabs={ESA_TAB_ITEMS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          accentColor="bg-emerald-500"
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
 
           <TabsContent value="overview" className="space-y-4">
             {/* Site Info */}
@@ -532,7 +543,8 @@ export default function ESASiteDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </ResponsiveTabs>
       </main>
     </div>
   );

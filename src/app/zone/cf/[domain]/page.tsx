@@ -4,16 +4,36 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Cloud, Globe, Activity, Database, Shield, TrendingUp, Zap, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatBytes, formatNumber } from "@/lib/utils";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar
 } from "recharts";
 import type { CFZone, CFAnalyticsData } from "@/types";
+
+/*
+CF_TAB_ITEMS Cloudflare 站点详情页标签项定义
+@功能 定义所有可用的数据分析标签页
+*/
+const CF_TAB_ITEMS = [
+  { value: "hourly", label: "小时趋势" },
+  { value: "daily", label: "每日趋势" },
+  { value: "geography", label: "地区分布" },
+  { value: "cache", label: "缓存分析" },
+  { value: "threats", label: "威胁分析" },
+  { value: "firewall", label: "防火墙" },
+  { value: "dns", label: "DNS" },
+  { value: "browser", label: "浏览器" },
+  { value: "status", label: "状态码" },
+  { value: "content", label: "内容类型" },
+  { value: "method", label: "请求方法" },
+  { value: "ipclass", label: "IP 分类" },
+  { value: "protocol", label: "协议版本" },
+];
 
 interface TrafficData {
   time: string;
@@ -36,10 +56,44 @@ export default function CFZoneDetailPage() {
 
   const [zone, setZone] = useState<CFZone | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("hourly");
+  const [firewallData, setFirewallData] = useState<any>(null);
+  const [dnsData, setDnsData] = useState<any>(null);
+  const [firewallLoading, setFirewallLoading] = useState(false);
+  const [dnsLoading, setDnsLoading] = useState(false);
 
   useEffect(() => {
     fetchZoneData();
   }, [domain]);
+
+  /*
+  懒加载防火墙和 DNS 数据 - 仅在切换到对应标签时触发请求
+  @功能 减少初始加载时间，按需获取防火墙事件和 DNS 查询统计
+  */
+  useEffect(() => {
+    if (activeTab === "firewall" && !firewallData && !firewallLoading) {
+      setFirewallLoading(true);
+      fetch(`/api/cf/firewall?domain=${encodeURIComponent(domain)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const zoneEvents = data.accounts?.flatMap((a: any) => a.zones || [])?.find((z: any) => z.domain === domain);
+          setFirewallData(zoneEvents?.events || null);
+        })
+        .catch(() => setFirewallData(null))
+        .finally(() => setFirewallLoading(false));
+    }
+    if (activeTab === "dns" && !dnsData && !dnsLoading) {
+      setDnsLoading(true);
+      fetch(`/api/cf/dns?domain=${encodeURIComponent(domain)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const zoneDns = data.accounts?.flatMap((a: any) => a.zones || [])?.find((z: any) => z.domain === domain);
+          setDnsData(zoneDns?.dns || null);
+        })
+        .catch(() => setDnsData(null))
+        .finally(() => setDnsLoading(false));
+    }
+  }, [activeTab, domain, firewallData, firewallLoading, dnsData, dnsLoading]);
 
   const fetchZoneData = async () => {
     setLoading(true);
@@ -302,20 +356,13 @@ export default function CFZoneDetailPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="hourly" className="space-y-3 sm:space-y-4">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex h-auto gap-1 bg-muted/50 p-1 w-max min-w-full">
-              <TabsTrigger value="hourly" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">小时趋势</TabsTrigger>
-              <TabsTrigger value="daily" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">每日趋势</TabsTrigger>
-              <TabsTrigger value="geography" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">地区分布</TabsTrigger>
-              <TabsTrigger value="cache" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">缓存分析</TabsTrigger>
-              <TabsTrigger value="threats" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">威胁分析</TabsTrigger>
-              <TabsTrigger value="browser" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">浏览器</TabsTrigger>
-              <TabsTrigger value="status" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">状态码</TabsTrigger>
-              <TabsTrigger value="content" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">内容类型</TabsTrigger>
-              <TabsTrigger value="protocol" className="text-xs sm:text-sm data-[state=active]:bg-cloudflare-orange data-[state=active]:text-white">协议版本</TabsTrigger>
-            </TabsList>
-          </ScrollArea>
+        <ResponsiveTabs
+          tabs={CF_TAB_ITEMS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          accentColor="bg-cloudflare-orange"
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
 
           <TabsContent value="hourly" className="space-y-4">
             <Card>
@@ -595,7 +642,234 @@ export default function CFZoneDetailPage() {
               </Card>
             </div>
           </TabsContent>
-        </Tabs>
+
+          {/* 防火墙事件标签 */}
+          <TabsContent value="firewall" className="space-y-4">
+            {firewallLoading ? (
+              <Card><CardContent className="p-6"><Skeleton className="h-[300px] w-full" /></CardContent></Card>
+            ) : firewallData ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                  <CardHeader><CardTitle>防火墙动作分布 (24h)</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {firewallData.byAction?.length > 0 ? firewallData.byAction.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-mono">{item.action}</p>
+                            <div className="h-2 bg-muted rounded-full mt-1">
+                              <div className="h-full bg-red-500 rounded-full" style={{ width: `${(item.count / (firewallData.byAction[0]?.count || 1)) * 100}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-center py-8">暂无防火墙事件</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>规则来源分布 (24h)</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {firewallData.bySource?.length > 0 ? firewallData.bySource.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-mono">{item.source}</p>
+                            <div className="h-2 bg-muted rounded-full mt-1">
+                              <div className="h-full bg-orange-500 rounded-full" style={{ width: `${(item.count / (firewallData.bySource[0]?.count || 1)) * 100}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>拦截国家 TOP 10 (24h)</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {firewallData.byCountry?.length > 0 ? firewallData.byCountry.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm">{item.country}</p>
+                            <div className="h-2 bg-muted rounded-full mt-1">
+                              <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(item.count / (firewallData.byCountry[0]?.count || 1)) * 100}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle>拦截路径 TOP 10 (24h)</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {firewallData.byPath?.length > 0 ? firewallData.byPath.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-mono truncate" title={item.path}>{item.path}</p>
+                            <div className="h-2 bg-muted rounded-full mt-1">
+                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(item.count / (firewallData.byPath[0]?.count || 1)) * 100}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">点击标签加载防火墙数据</CardContent></Card>
+            )}
+          </TabsContent>
+
+          {/* DNS 查询标签 */}
+          <TabsContent value="dns" className="space-y-4">
+            {dnsLoading ? (
+              <Card><CardContent className="p-6"><Skeleton className="h-[300px] w-full" /></CardContent></Card>
+            ) : dnsData ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+                  <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20">
+                    <CardContent className="p-4 sm:p-6">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">24h DNS 总查询</p>
+                      <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{formatNumber(dnsData.totalQueries || 0)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20">
+                    <CardContent className="p-4 sm:p-6">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">查询类型数</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">{dnsData.byQueryType?.length || 0}</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20">
+                    <CardContent className="p-4 sm:p-6">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">查询域名数</p>
+                      <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{dnsData.byQueryName?.length || 0}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Card>
+                    <CardHeader><CardTitle>查询类型分布</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {dnsData.byQueryType?.length > 0 ? dnsData.byQueryType.map((item: any, i: number) => (
+                          <div key={i} className="flex items-center gap-4">
+                            <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-mono">{item.type}</p>
+                              <div className="h-2 bg-muted rounded-full mt-1">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(item.count / (dnsData.byQueryType[0]?.count || 1)) * 100}%` }} />
+                              </div>
+                            </div>
+                            <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                          </div>
+                        )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader><CardTitle>响应码分布</CardTitle></CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {dnsData.byResponseCode?.length > 0 ? dnsData.byResponseCode.map((item: any, i: number) => (
+                          <div key={i} className="flex items-center gap-4">
+                            <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                            <div className="flex-1">
+                              <p className="text-sm font-mono">{item.code}</p>
+                              <div className="h-2 bg-muted rounded-full mt-1">
+                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${(item.count / (dnsData.byResponseCode[0]?.count || 1)) * 100}%` }} />
+                              </div>
+                            </div>
+                            <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                          </div>
+                        )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card>
+                  <CardHeader><CardTitle>查询域名 TOP 15</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {dnsData.byQueryName?.length > 0 ? dnsData.byQueryName.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center gap-4">
+                          <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-mono truncate" title={item.name}>{item.name}</p>
+                            <div className="h-2 bg-muted rounded-full mt-1">
+                              <div className="h-full bg-purple-500 rounded-full" style={{ width: `${(item.count / (dnsData.byQueryName[0]?.count || 1)) * 100}%` }} />
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">{formatNumber(item.count)}</span>
+                        </div>
+                      )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">点击标签加载 DNS 数据</CardContent></Card>
+            )}
+          </TabsContent>
+
+          {/* 请求方法标签 */}
+          <TabsContent value="method">
+            <Card>
+              <CardHeader><CardTitle>HTTP 请求方法分布</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(zone?.httpMethods as { name: string; requests: number }[] | undefined)?.length ? (zone.httpMethods as { name: string; requests: number }[]).map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-mono font-semibold">{item.name}</p>
+                        <div className="h-2 bg-muted rounded-full mt-1">
+                          <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(item.requests / ((zone?.httpMethods as { name: string; requests: number }[])?.[0]?.requests || 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatNumber(item.requests)}</span>
+                    </div>
+                  )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* IP 分类标签 */}
+          <TabsContent value="ipclass">
+            <Card>
+              <CardHeader><CardTitle>IP 分类分布</CardTitle></CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {(zone?.ipClasses as { name: string; requests: number }[] | undefined)?.length ? (zone.ipClasses as { name: string; requests: number }[]).map((item, i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <span className="w-6 text-center font-medium text-muted-foreground">{i + 1}</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-mono">{item.name}</p>
+                        <div className="h-2 bg-muted rounded-full mt-1">
+                          <div className="h-full bg-cyan-500 rounded-full" style={{ width: `${(item.requests / ((zone?.ipClasses as { name: string; requests: number }[])?.[0]?.requests || 1)) * 100}%` }} />
+                        </div>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{formatNumber(item.requests)}</span>
+                    </div>
+                  )) : <p className="text-muted-foreground text-center py-8">暂无数据</p>}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          </Tabs>
+        </ResponsiveTabs>
       </main>
     </div>
   );

@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs";
+import { TopList } from "@/components/ui/top-list";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ArrowLeft, Zap, Globe, Activity, Database, TrendingUp, Shield, Server, Clock, Wifi, Monitor, Smartphone, Chrome, User, Link2, FileType, MapPin, Timer, Code } from "lucide-react";
 import { formatBytes, formatNumber } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, Legend
 } from "recharts";
@@ -38,6 +39,28 @@ const COUNTRY_MAP: Record<string, string> = {
   'AT': '奥地利', 'BE': '比利时', 'DK': '丹麦', 'FI': '芬兰', 'NO': '挪威',
   'IE': '爱尔兰', 'PT': '葡萄牙', 'GR': '希腊', 'NZ': '新西兰', 'CO': '哥伦比亚'
 };
+
+/*
+EO_TAB_ITEMS EdgeOne 站点详情页标签项定义
+@功能 定义所有可用的数据分析标签页
+*/
+const EO_TAB_ITEMS = [
+  { value: "traffic", label: "流量趋势" },
+  { value: "bandwidth", label: "带宽分析" },
+  { value: "origin", label: "回源分析" },
+  { value: "edgefunc", label: "边缘函数" },
+  { value: "performance", label: "响应性能" },
+  { value: "security", label: "安全防护" },
+  { value: "country", label: "地区分布" },
+  { value: "status", label: "状态码" },
+  { value: "domain", label: "域名" },
+  { value: "url", label: "热门URL" },
+  { value: "resource", label: "资源类型" },
+  { value: "referer", label: "来源" },
+  { value: "ip", label: "客户端IP" },
+  { value: "device", label: "设备/浏览器/OS" },
+  { value: "ua", label: "User Agent" },
+];
 
 interface ZoneDetail {
   ZoneId: string;
@@ -76,6 +99,7 @@ export default function EOZoneDetailPage() {
 
   const [zone, setZone] = useState<ZoneDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("traffic");
   const [trafficData, setTrafficData] = useState<TrafficData[]>([]);
   const [requestData, setRequestData] = useState<TrafficData[]>([]);
   const [countryData, setCountryData] = useState<TopData[]>([]);
@@ -128,79 +152,135 @@ export default function EOZoneDetailPage() {
   const [originOutBandwidthData, setOriginOutBandwidthData] = useState<TrafficData[]>([]);
   const [originInBandwidthData, setOriginInBandwidthData] = useState<TrafficData[]>([]);
 
+  /*
+  topDataLoaded 标记 TOP 数据（按标签懒加载的数据）是否已加载
+  @功能 避免重复加载已获取的 TOP 维度数据
+  */
+  const [topDataLoaded, setTopDataLoaded] = useState<Set<string>>(new Set());
+
   useEffect(() => {
     fetchZoneData();
   }, [zoneId]);
 
-  const fetchZoneData = async () => {
-    setLoading(true);
+  /*
+  getTimeRange 获取最近 24 小时的时间范围
+  @return startTime 和 endTime 字符串
+  */
+  const getTimeRange = () => {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const startTime = yesterday.toISOString().slice(0, 19) + "Z";
-    const endTime = now.toISOString().slice(0, 19) + "Z";
+    return {
+      startTime: yesterday.toISOString().slice(0, 19) + "Z",
+      endTime: now.toISOString().slice(0, 19) + "Z",
+    };
+  };
+
+  /*
+  parseTimeline 解析时间线数据（通用解析器）
+  @功能 解析腾讯云 API 返回的 Data[].TypeValue[].Detail[] 格式
+  */
+  const parseTimeline = (data: any) => {
+    const result: TrafficData[] = [];
+    let total = 0;
+    data.Data?.forEach((item: any) => {
+      item.TypeValue?.forEach((tv: any) => {
+        tv.Detail?.forEach((d: any) => {
+          result.push({
+            time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+            value: d.Value
+          });
+          total += d.Value;
+        });
+      });
+    });
+    return { data: result, total };
+  };
+
+  /*
+  parseOriginPullTimeline 解析回源时间线数据
+  @功能 解析 TimingDataRecords[].TypeValue[].Detail[] 格式
+  */
+  const parseOriginPullTimeline = (data: any) => {
+    const result: TrafficData[] = [];
+    let total = 0;
+    data.TimingDataRecords?.forEach((item: any) => {
+      item.TypeValue?.forEach((tv: any) => {
+        tv.Detail?.forEach((d: any) => {
+          result.push({
+            time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+            value: d.Value
+          });
+          total += d.Value;
+        });
+      });
+    });
+    return { data: result, total };
+  };
+
+  /*
+  parseSecurityData 解析安全防护数据
+  @功能 解析 Data[].Value[].Detail[] 格式
+  */
+  const parseSecurityData = (data: any) => {
+    const result: TrafficData[] = [];
+    let total = 0;
+    data.Data?.forEach((item: any) => {
+      item.Value?.forEach((v: any) => {
+        v.Detail?.forEach((d: any) => {
+          result.push({
+            time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+            value: d.Value
+          });
+          total += d.Value;
+        });
+      });
+    });
+    return { data: result, total };
+  };
+
+  /*
+  parseTopData 解析 TOP 排行数据
+  @功能 解析 Data[].DetailData[] 格式
+  */
+  const parseTopData = (data: any, nameMap?: Record<string, string>) => {
+    const result: TopData[] = [];
+    data.Data?.forEach((item: any) => {
+      item.DetailData?.forEach((d: any) => {
+        const key = d.Key || d.Name || "Unknown";
+        const displayName = nameMap ? (nameMap[key] || key) : key;
+        result.push({ name: displayName, value: d.Value || 0 });
+      });
+    });
+    return result.slice(0, 10);
+  };
+
+  /*
+  fetchZoneData 分阶段加载站点数据
+  @功能 阶段1：核心数据（流量/请求）→ 立即取消 loading 显示页面
+         阶段2：次要数据（带宽/回源/性能/安全/边缘函数）→ 后台加载渐进渲染
+  */
+  const fetchZoneData = async () => {
+    setLoading(true);
+    const { startTime, endTime } = getTimeRange();
+    const base = `/api/eo/traffic?zoneId=${zoneId}`;
+    const t = (metric: string) => `${base}&metric=${metric}&startTime=${startTime}&endTime=${endTime}`;
 
     try {
-      // Fetch zone info
+      /* 阶段 0：获取 zone 基本信息 */
       const zonesRes = await fetch("/api/eo/zones");
       const zonesData = await zonesRes.json();
       const zoneInfo = zonesData.Zones?.find((z: ZoneDetail) => z.ZoneId === zoneId);
       if (zoneInfo) setZone(zoneInfo);
 
-      // Fetch all traffic data including Edge Functions and enhanced bandwidth
-      const [fluxRes, inFluxRes, reqRes, bandwidthRes, inBwRes, outBwRes, originFluxRes, originInFluxRes, originReqRes, originOutBwRes, originInBwRes, countryRes, provinceRes, statusRes, urlRes, domainRes, refererRes, deviceRes, browserRes, osRes, uaRes, resourceTypeRes, sipRes, securityRes, securityAclRes, securityRateRes, perfRes, firstByteRes, edgeFuncRes] = await Promise.all([
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_inFlux&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_request&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_bandwidth&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_inBandwidth&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outBandwidth&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_hy&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_inFlux_hy&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_request_hy&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outBandwidth_hy&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_inBandwidth_hy&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_country&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_province&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_statusCode&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_url&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_domain&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_referers&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_ua_device&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_ua_browser&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_ua_os&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_ua&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_resourceType&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_outFlux_sip&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=ccManage_interceptNum&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=ccAcl_interceptNum&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=ccRate_interceptNum&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_avgResponseTime&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/traffic?zoneId=${zoneId}&metric=l7Flow_avgFirstByteResponseTime&startTime=${startTime}&endTime=${endTime}`),
-        fetch(`/api/eo/functions?zoneId=${zoneId}&startTime=${startTime}&endTime=${endTime}`),
+      /* 阶段 1：核心流量数据（3 个请求）→ 加载完立即显示 */
+      const [fluxRes, inFluxRes, reqRes] = await Promise.all([
+        fetch(t("l7Flow_outFlux")),
+        fetch(t("l7Flow_inFlux")),
+        fetch(t("l7Flow_request")),
       ]);
-
-      const [fluxData, inFluxData, reqData, bandwidthJson, inBwJson, outBwJson, originFluxJson, originInFluxJson, originReqJson, originOutBwJson, originInBwJson, countryJson, provinceJson, statusJson, urlJson, domainJson, refererJson, deviceJson, browserJson, osJson, uaJson, resourceTypeJson, sipJson, securityJson, securityAclJson, securityRateJson, perfJson, firstByteJson, edgeFuncJson] = await Promise.all([
-        fluxRes.json(), inFluxRes.json(), reqRes.json(), bandwidthRes.json(), inBwRes.json(), outBwRes.json(), originFluxRes.json(), originInFluxRes.json(), originReqRes.json(), originOutBwRes.json(), originInBwRes.json(), countryRes.json(), provinceRes.json(), statusRes.json(), urlRes.json(), domainRes.json(), refererRes.json(), deviceRes.json(), browserRes.json(), osRes.json(), uaRes.json(), resourceTypeRes.json(), sipRes.json(), securityRes.json(), securityAclRes.json(), securityRateRes.json(), perfRes.json(), firstByteRes.json(), edgeFuncRes.json()
+      const [fluxData, inFluxData, reqData] = await Promise.all([
+        fluxRes.json(), inFluxRes.json(), reqRes.json(),
       ]);
-
-      // Parse traffic timeline
-      const parseTimeline = (data: any) => {
-        const result: TrafficData[] = [];
-        let total = 0;
-        data.Data?.forEach((item: any) => {
-          item.TypeValue?.forEach((tv: any) => {
-            tv.Detail?.forEach((d: any) => {
-              result.push({
-                time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-                value: d.Value
-              });
-              total += d.Value;
-            });
-          });
-        });
-        return { data: result, total };
-      };
-
       const flux = parseTimeline(fluxData);
       const inFlux = parseTimeline(inFluxData);
       const req = parseTimeline(reqData);
@@ -210,154 +290,160 @@ export default function EOZoneDetailPage() {
       setTotalInFlux(inFlux.total);
       setTotalRequests(req.total);
 
-      // Parse performance data
-      const perf = parseTimeline(perfJson);
-      const firstByte = parseTimeline(firstByteJson);
-      setPerformanceData(perf.data);
-      setFirstByteData(firstByte.data);
-      if (perf.data.length > 0) {
-        const avgPerf = perf.total / perf.data.length;
-        setAvgResponseTime(avgPerf);
-      }
-      if (firstByte.data.length > 0) {
-        const avgFirstByte = firstByte.total / firstByte.data.length;
-        setAvgFirstByteTime(avgFirstByte);
-      }
+      /* 取消全屏 loading，页面可交互 */
+      setLoading(false);
 
-      // Parse top data - API returns Key not Name
-      const parseTopData = (data: any, nameMap?: Record<string, string>) => {
-        const result: TopData[] = [];
-        data.Data?.forEach((item: any) => {
-          item.DetailData?.forEach((d: any) => {
-            const key = d.Key || d.Name || "Unknown";
-            const displayName = nameMap ? (nameMap[key] || key) : key;
-            result.push({ name: displayName, value: d.Value || 0 });
-          });
-        });
-        return result.slice(0, 10);
-      };
+      /* 阶段 2：带宽 + 回源 + 性能 + 安全 + 边缘函数（后台并行加载） */
+      Promise.all([
+        fetch(t("l7Flow_bandwidth")),
+        fetch(t("l7Flow_inBandwidth")),
+        fetch(t("l7Flow_outBandwidth")),
+        fetch(t("l7Flow_outFlux_hy")),
+        fetch(t("l7Flow_inFlux_hy")),
+        fetch(t("l7Flow_request_hy")),
+        fetch(t("l7Flow_outBandwidth_hy")),
+        fetch(t("l7Flow_inBandwidth_hy")),
+        fetch(t("l7Flow_avgResponseTime")),
+        fetch(t("l7Flow_avgFirstByteResponseTime")),
+        fetch(t("ccManage_interceptNum")),
+        fetch(t("ccAcl_interceptNum")),
+        fetch(t("ccRate_interceptNum")),
+        fetch(`/api/eo/functions?zoneId=${zoneId}&startTime=${startTime}&endTime=${endTime}`),
+      ]).then(async (responses) => {
+        const [bandwidthJson, inBwJson, outBwJson, originFluxJson, originInFluxJson, originReqJson, originOutBwJson, originInBwJson, perfJson, firstByteJson, securityJson, securityAclJson, securityRateJson, edgeFuncJson] = await Promise.all(
+          responses.map((r) => r.json())
+        );
 
-      setCountryData(parseTopData(countryJson, COUNTRY_MAP));
-      setProvinceData(parseTopData(provinceJson, PROVINCE_MAP));
-      setStatusCodeData(parseTopData(statusJson));
-      setUrlData(parseTopData(urlJson));
-      setDomainData(parseTopData(domainJson));
-      setRefererData(parseTopData(refererJson));
-      setDeviceData(parseTopData(deviceJson));
-      setBrowserData(parseTopData(browserJson));
-      setOsData(parseTopData(osJson));
-      setUaData(parseTopData(uaJson));
-      setResourceTypeData(parseTopData(resourceTypeJson));
-      setSipData(parseTopData(sipJson));
-
-      // Parse bandwidth data
-      const bwResult: BandwidthData[] = [];
-      let maxBw = 0;
-      bandwidthJson.Data?.forEach((item: any) => {
-        item.TypeValue?.forEach((tv: any) => {
-          tv.Detail?.forEach((d: any) => {
-            bwResult.push({
-              time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-              bandwidth: d.Value
-            });
-            if (d.Value > maxBw) maxBw = d.Value;
-          });
-        });
-      });
-      setBandwidthData(bwResult);
-      setPeakBandwidth(maxBw);
-
-      // Parse origin pull data - uses TimingDataRecords not Data
-      const parseOriginPullTimeline = (data: any) => {
-        const result: TrafficData[] = [];
-        let total = 0;
-        data.TimingDataRecords?.forEach((item: any) => {
+        /* 带宽 */
+        const bwResult: BandwidthData[] = [];
+        let maxBw = 0;
+        bandwidthJson.Data?.forEach((item: any) => {
           item.TypeValue?.forEach((tv: any) => {
             tv.Detail?.forEach((d: any) => {
-              result.push({
-                time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-                value: d.Value
-              });
-              total += d.Value;
+              bwResult.push({ time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }), bandwidth: d.Value });
+              if (d.Value > maxBw) maxBw = d.Value;
             });
           });
         });
-        return { data: result, total };
-      };
-      const originResult = parseOriginPullTimeline(originFluxJson);
-      const originInResult = parseOriginPullTimeline(originInFluxJson);
-      const originReqResult = parseOriginPullTimeline(originReqJson);
-      setOriginPullData(originResult.data);
-      setOriginInFluxData(originInResult.data);
-      setOriginRequestData(originReqResult.data);
-      setOriginFlux(originResult.total);
-      setOriginInFlux(originInResult.total);
-      setOriginRequests(originReqResult.total);
+        setBandwidthData(bwResult);
+        setPeakBandwidth(maxBw);
 
-      // Parse security data - uses Data[].Value[].Detail format
-      const parseSecurityData = (data: any) => {
-        const result: TrafficData[] = [];
-        let total = 0;
-        data.Data?.forEach((item: any) => {
-          item.Value?.forEach((v: any) => {
-            v.Detail?.forEach((d: any) => {
-              result.push({
-                time: new Date(d.Timestamp * 1000).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-                value: d.Value
-              });
-              total += d.Value;
-            });
-          });
-        });
-        return { data: result, total };
-      };
-      const securityResult = parseSecurityData(securityJson);
-      const securityAclResult = parseSecurityData(securityAclJson);
-      const securityRateResult = parseSecurityData(securityRateJson);
-      setSecurityData(securityResult.data);
-      setSecurityAclData(securityAclResult.data);
-      setSecurityRateData(securityRateResult.data);
-      setTotalSecurityHits(securityResult.total);
-      setTotalAclHits(securityAclResult.total);
-      setTotalRateHits(securityRateResult.total);
+        const inBw = parseTimeline(inBwJson);
+        const outBw = parseTimeline(outBwJson);
+        setInBandwidthData(inBw.data);
+        setOutBandwidthData(outBw.data);
+        setPeakInBandwidth(inBw.data.length > 0 ? Math.max(...inBw.data.map(d => d.value)) : 0);
+        setPeakOutBandwidth(outBw.data.length > 0 ? Math.max(...outBw.data.map(d => d.value)) : 0);
 
-      // Calculate cache hit rate
-      if (flux.total > 0 && originResult.total > 0) {
-        const rate = ((flux.total - originResult.total) / flux.total) * 100;
-        setCacheHitRate(Math.max(0, rate));
-      }
+        /* 回源 */
+        const originResult = parseOriginPullTimeline(originFluxJson);
+        const originInResult = parseOriginPullTimeline(originInFluxJson);
+        const originReqResult = parseOriginPullTimeline(originReqJson);
+        setOriginPullData(originResult.data);
+        setOriginInFluxData(originInResult.data);
+        setOriginRequestData(originReqResult.data);
+        setOriginFlux(originResult.total);
+        setOriginInFlux(originInResult.total);
+        setOriginRequests(originReqResult.total);
 
-      // Parse enhanced bandwidth data (in/out)
-      const inBw = parseTimeline(inBwJson);
-      const outBw = parseTimeline(outBwJson);
-      setInBandwidthData(inBw.data);
-      setOutBandwidthData(outBw.data);
-      setPeakInBandwidth(inBw.data.length > 0 ? Math.max(...inBw.data.map(d => d.value)) : 0);
-      setPeakOutBandwidth(outBw.data.length > 0 ? Math.max(...outBw.data.map(d => d.value)) : 0);
+        const originOutBw = parseOriginPullTimeline(originOutBwJson);
+        const originInBw = parseOriginPullTimeline(originInBwJson);
+        setOriginOutBandwidthData(originOutBw.data);
+        setOriginInBandwidthData(originInBw.data);
+        setOriginOutBandwidth(originOutBw.data.length > 0 ? Math.max(...originOutBw.data.map(d => d.value)) : 0);
+        setOriginInBandwidth(originInBw.data.length > 0 ? Math.max(...originInBw.data.map(d => d.value)) : 0);
 
-      // Parse origin bandwidth data
-      const originOutBw = parseOriginPullTimeline(originOutBwJson);
-      const originInBw = parseOriginPullTimeline(originInBwJson);
-      setOriginOutBandwidthData(originOutBw.data);
-      setOriginInBandwidthData(originInBw.data);
-      setOriginOutBandwidth(originOutBw.data.length > 0 ? Math.max(...originOutBw.data.map(d => d.value)) : 0);
-      setOriginInBandwidth(originInBw.data.length > 0 ? Math.max(...originInBw.data.map(d => d.value)) : 0);
+        /* 缓存命中率 */
+        if (flux.total > 0 && originResult.total > 0) {
+          setCacheHitRate(Math.max(0, ((flux.total - originResult.total) / flux.total) * 100));
+        }
 
-      // Parse Edge Functions data
-      if (edgeFuncJson) {
-        const efReq = parseTimeline(edgeFuncJson.requests || {});
-        const efCpu = parseTimeline(edgeFuncJson.cpuTime || {});
-        setEdgeFuncRequestsData(efReq.data);
-        setEdgeFuncCpuData(efCpu.data);
-        setEdgeFuncRequests(efReq.total);
-        setEdgeFuncCpuTime(efCpu.total);
-      }
+        /* 性能 */
+        const perf = parseTimeline(perfJson);
+        const firstByte = parseTimeline(firstByteJson);
+        setPerformanceData(perf.data);
+        setFirstByteData(firstByte.data);
+        if (perf.data.length > 0) setAvgResponseTime(perf.total / perf.data.length);
+        if (firstByte.data.length > 0) setAvgFirstByteTime(firstByte.total / firstByte.data.length);
+
+        /* 安全 */
+        const securityResult = parseSecurityData(securityJson);
+        const securityAclResult = parseSecurityData(securityAclJson);
+        const securityRateResult = parseSecurityData(securityRateJson);
+        setSecurityData(securityResult.data);
+        setSecurityAclData(securityAclResult.data);
+        setSecurityRateData(securityRateResult.data);
+        setTotalSecurityHits(securityResult.total);
+        setTotalAclHits(securityAclResult.total);
+        setTotalRateHits(securityRateResult.total);
+
+        /* 边缘函数 */
+        if (edgeFuncJson) {
+          const efReq = parseTimeline(edgeFuncJson.requests || {});
+          const efCpu = parseTimeline(edgeFuncJson.cpuTime || {});
+          setEdgeFuncRequestsData(efReq.data);
+          setEdgeFuncCpuData(efCpu.data);
+          setEdgeFuncRequests(efReq.total);
+          setEdgeFuncCpuTime(efCpu.total);
+        }
+      }).catch((err) => console.error("Phase 2 fetch error:", err));
+
     } catch (err) {
       console.error("Fetch error:", err);
-    } finally {
       setLoading(false);
     }
   };
+
+  /*
+  懒加载 TOP 数据 - 仅在切换到对应标签时触发
+  @功能 地区/状态码/域名/URL/来源/设备/浏览器/OS/UA/资源类型/客户端IP 按需加载
+  */
+  useEffect(() => {
+    if (loading || !zoneId) return;
+    const { startTime, endTime } = getTimeRange();
+    const base = `/api/eo/traffic?zoneId=${zoneId}`;
+    const t = (metric: string) => `${base}&metric=${metric}&startTime=${startTime}&endTime=${endTime}`;
+
+    const tabMetricMap: Record<string, { metrics: { metric: string; setter: (data: TopData[]) => void; nameMap?: Record<string, string> }[] }> = {
+      country: {
+        metrics: [
+          { metric: "l7Flow_outFlux_country", setter: setCountryData, nameMap: COUNTRY_MAP },
+          { metric: "l7Flow_outFlux_province", setter: setProvinceData, nameMap: PROVINCE_MAP },
+        ],
+      },
+      status: { metrics: [{ metric: "l7Flow_outFlux_statusCode", setter: setStatusCodeData }] },
+      domain: { metrics: [{ metric: "l7Flow_outFlux_domain", setter: setDomainData }] },
+      url: { metrics: [{ metric: "l7Flow_outFlux_url", setter: setUrlData }] },
+      referer: { metrics: [{ metric: "l7Flow_outFlux_referers", setter: setRefererData }] },
+      resource: { metrics: [{ metric: "l7Flow_outFlux_resourceType", setter: setResourceTypeData }] },
+      ip: { metrics: [{ metric: "l7Flow_outFlux_sip", setter: setSipData }] },
+      device: {
+        metrics: [
+          { metric: "l7Flow_outFlux_ua_device", setter: setDeviceData },
+          { metric: "l7Flow_outFlux_ua_browser", setter: setBrowserData },
+          { metric: "l7Flow_outFlux_ua_os", setter: setOsData },
+        ],
+      },
+      ua: { metrics: [{ metric: "l7Flow_outFlux_ua", setter: setUaData }] },
+    };
+
+    const config = tabMetricMap[activeTab];
+    if (!config || topDataLoaded.has(activeTab)) return;
+
+    Promise.all(
+      config.metrics.map(async ({ metric, setter, nameMap }) => {
+        try {
+          const res = await fetch(t(metric));
+          const json = await res.json();
+          setter(parseTopData(json, nameMap));
+        } catch (err) {
+          console.error(`Lazy load ${metric} error:`, err);
+        }
+      })
+    ).then(() => {
+      setTopDataLoaded((prev) => new Set(prev).add(activeTab));
+    });
+  }, [activeTab, loading, zoneId, topDataLoaded]);
 
   if (loading) {
     return (
@@ -552,26 +638,13 @@ export default function EOZoneDetailPage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="traffic" className="space-y-3 sm:space-y-4">
-          <ScrollArea className="w-full">
-            <TabsList className="inline-flex h-auto gap-1 bg-muted/50 p-1 w-max min-w-full">
-            <TabsTrigger value="traffic" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">流量趋势</TabsTrigger>
-            <TabsTrigger value="bandwidth" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">带宽分析</TabsTrigger>
-            <TabsTrigger value="origin" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">回源分析</TabsTrigger>
-            <TabsTrigger value="edgefunc" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">边缘函数</TabsTrigger>
-            <TabsTrigger value="performance" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">响应性能</TabsTrigger>
-            <TabsTrigger value="security" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">安全防护</TabsTrigger>
-            <TabsTrigger value="country" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">地区分布</TabsTrigger>
-            <TabsTrigger value="status" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">状态码</TabsTrigger>
-            <TabsTrigger value="domain" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">域名</TabsTrigger>
-            <TabsTrigger value="url" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">热门URL</TabsTrigger>
-            <TabsTrigger value="resource" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">资源类型</TabsTrigger>
-            <TabsTrigger value="referer" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">来源</TabsTrigger>
-            <TabsTrigger value="ip" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">客户端IP</TabsTrigger>
-            <TabsTrigger value="device" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">设备/浏览器/OS</TabsTrigger>
-            <TabsTrigger value="ua" className="data-[state=active]:bg-edgeone-blue data-[state=active]:text-white">User Agent</TabsTrigger>
-            </TabsList>
-          </ScrollArea>
+        <ResponsiveTabs
+          tabs={EO_TAB_ITEMS}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          accentColor="bg-edgeone-blue"
+        >
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
 
           <TabsContent value="traffic" className="space-y-4">
             <Card>
@@ -1180,7 +1253,8 @@ export default function EOZoneDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </ResponsiveTabs>
       </main>
     </div>
   );

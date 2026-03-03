@@ -138,6 +138,10 @@ export function Dashboard() {
     let totalThreats = 0;
     let totalCachedRequests = 0;
     let totalCachedBytes = 0;
+    let totalPageViews = 0;
+    let totalUniques = 0;
+    let totalEncryptedBytes = 0;
+    let totalEncryptedRequests = 0;
 
     cfData.accounts.forEach((account) => {
       account.zones?.forEach((zone) => {
@@ -170,6 +174,12 @@ export function Dashboard() {
             totalThreats += dataPoint.sum.threats || 0;
             totalCachedRequests += dataPoint.sum.cachedRequests || 0;
             totalCachedBytes += dataPoint.sum.cachedBytes || 0;
+            totalPageViews += dataPoint.sum.pageViews || 0;
+            totalEncryptedBytes += dataPoint.sum.encryptedBytes || 0;
+            totalEncryptedRequests += dataPoint.sum.encryptedRequests || 0;
+          }
+          if ((dataPoint as any).uniq) {
+            totalUniques += (dataPoint as any).uniq.uniques || 0;
           }
         });
       });
@@ -181,7 +191,12 @@ export function Dashboard() {
       totalThreats,
       totalCachedRequests,
       totalCachedBytes,
+      totalPageViews,
+      totalUniques,
+      totalEncryptedBytes,
+      totalEncryptedRequests,
       cacheHitRate: totalRequests > 0 ? ((totalCachedRequests / totalRequests) * 100).toFixed(1) : "0",
+      encryptedRate: totalRequests > 0 ? ((totalEncryptedRequests / totalRequests) * 100).toFixed(1) : "0",
     };
   }, [cfData, selectedPeriod]);
 
@@ -215,91 +230,93 @@ export function Dashboard() {
     </Card>
   );
 
+  /*
+  getPeriodLabel 获取时间周期的显示标签
+  @param period 时间周期值
+  @return 对应的国际化文本
+  */
+  const getPeriodLabel = (period: TimePeriod) =>
+    t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays");
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-between px-3 sm:px-4 max-w-7xl">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Cloud className="h-5 w-5 sm:h-6 sm:w-6 text-cloudflare-orange" />
-              <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-edgeone-blue" />
+      {/* Header - Claude 风格简洁导航 */}
+      <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 glass-card">
+        <div className="mx-auto flex h-14 sm:h-16 items-center justify-between px-4 sm:px-6 lg:px-8 max-w-[1400px]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
+              <Activity className="h-4 w-4 text-primary" />
             </div>
-            <h1 className="text-base sm:text-xl font-bold">{t("dashboardTitle")}</h1>
+            <h1 className="text-sm sm:text-base font-semibold tracking-tight">{t("dashboardTitle")}</h1>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* Period Selector - Hidden on mobile, shown in dropdown */}
-            <ScrollArea className="max-w-[200px] sm:max-w-none hidden sm:block">
-              <div className="flex rounded-lg border bg-muted p-1">
-                {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
-                  <Button
-                    key={period}
-                    variant={selectedPeriod === period ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setSelectedPeriod(period)}
-                    className="px-2 sm:px-3 text-xs sm:text-sm"
-                  >
-                    {t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays")}
-                  </Button>
-                ))}
-              </div>
-            </ScrollArea>
-            {/* Mobile period selector */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* 桌面端时间选择器 */}
+            <div className="hidden sm:flex items-center rounded-full border border-border/60 bg-muted/50 p-0.5">
+              {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setSelectedPeriod(period)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                    selectedPeriod === period
+                      ? "bg-foreground text-background shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {getPeriodLabel(period)}
+                </button>
+              ))}
+            </div>
+            {/* 移动端时间选择器 */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild className="sm:hidden">
-                <Button variant="outline" size="sm" className="text-xs">
-                  {t(selectedPeriod === "1day" ? "singleDay" : selectedPeriod === "3days" ? "threeDays" : selectedPeriod === "7days" ? "sevenDays" : "thirtyDays")}
-                </Button>
+                <button className="flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+                  {getPeriodLabel(selectedPeriod)}
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 {(["1day", "3days", "7days", "30days"] as TimePeriod[]).map((period) => (
                   <DropdownMenuItem key={period} onClick={() => setSelectedPeriod(period)}>
-                    {t(period === "1day" ? "singleDay" : period === "3days" ? "threeDays" : period === "7days" ? "sevenDays" : "thirtyDays")}
+                    {getPeriodLabel(period)}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Refresh */}
-            <Button variant="outline" size="icon" onClick={fetchData}>
+            <div className="w-px h-5 bg-border/60 mx-0.5 hidden sm:block" />
+
+            {/* 刷新 */}
+            <button
+              onClick={fetchData}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="刷新数据"
+            >
               <RefreshCw className="h-4 w-4" />
-            </Button>
+            </button>
 
-            {/* Theme Toggle */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                  {t("light")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                  {t("dark")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                  {t("system")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* 主题切换 */}
+            <button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="切换主题"
+            >
+              <Sun className="h-4 w-4 block dark:hidden" />
+              <Moon className="h-4 w-4 hidden dark:block" />
+            </button>
 
-            {/* Language Toggle */}
-            <Button
-              variant="outline"
-              size="icon"
+            {/* 语言切换 */}
+            <button
               onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
+              className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="切换语言"
             >
               <Languages className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+      <main className="mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 max-w-[1400px]">
         {error && (
           <Card className="mb-4 sm:mb-6 border-destructive">
             <CardContent className="flex items-center justify-between p-3 sm:p-4">
@@ -311,17 +328,17 @@ export function Dashboard() {
           </Card>
         )}
 
-        {/* Loading state - show skeleton while any data is loading */}
-        {loading && !hasCfData && !hasEoData && !hasEsaData && (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">加载中...</p>
+        {/* 初始加载状态 - 仅在完全没有任何数据且所有源都在加载时显示 */}
+        {cfLoading && workersLoading && eoLoading && esaLoading && !hasCfData && !hasEoData && !hasEsaData && (
+          <div className="flex items-center justify-center min-h-[40vh]">
+            <div className="text-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto"></div>
+              <p className="text-sm text-muted-foreground">加载中...</p>
             </div>
           </div>
         )}
 
-        {/* Show "no data" only after all loading is complete */}
+        {/* 数据为空判断 - 仅在所有源都加载完成后 */}
         {!loading && !hasCfData && !hasEoData && !hasEsaData ? (
           <div className="flex items-center justify-center min-h-[60vh]">
             <Card className="w-full max-w-md mx-auto">
@@ -342,17 +359,17 @@ export function Dashboard() {
                   <span className="hidden xs:inline">{t("dashboardTitle")}</span>
                   <span className="xs:hidden">全部</span>
                 </TabsTrigger>
-                <TabsTrigger value="cloudflare" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2" disabled={!hasCfData}>
+                <TabsTrigger value="cloudflare" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
                   <Cloud className="h-3 w-3 sm:h-4 sm:w-4 text-cloudflare-orange" />
                   <span className="hidden sm:inline">Cloudflare</span>
                   <span className="sm:hidden">CF</span>
                 </TabsTrigger>
-                <TabsTrigger value="edgeone" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2" disabled={!hasEoData}>
+                <TabsTrigger value="edgeone" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
                   <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-edgeone-blue" />
                   <span className="hidden sm:inline">EdgeOne</span>
                   <span className="sm:hidden">EO</span>
                 </TabsTrigger>
-                <TabsTrigger value="esa" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2" disabled={!hasEsaData}>
+                <TabsTrigger value="esa" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm py-2">
                   <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span className="hidden sm:inline">Aliyun ESA</span>
                   <span className="sm:hidden">ESA</span>
@@ -445,41 +462,41 @@ export function Dashboard() {
                 )}
                 {!workersLoading && workersData && workersData.totalRequests > 0 && (
                   <section>
-                    <div className="mb-4 flex items-center gap-2">
-                      <Code className="h-5 w-5 text-cloudflare-orange" />
-                      <h2 className="text-lg font-semibold">Cloudflare Workers (24h)</h2>
+                    <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                      <Code className="h-4 w-4 sm:h-5 sm:w-5 text-cloudflare-orange" />
+                      <h2 className="text-sm sm:text-lg font-semibold">Cloudflare Workers (24h)</h2>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-3 sm:mb-4">
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-orange-500/10">
-                            <Activity className="h-6 w-6 text-orange-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-orange-500/10 flex-shrink-0">
+                            <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-orange-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">总请求数</p>
-                            <p className="text-2xl font-bold">{formatNumber(workersData.totalRequests)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">总请求数</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(workersData.totalRequests)}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-red-500/10">
-                            <AlertTriangle className="h-6 w-6 text-red-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-red-500/10 flex-shrink-0">
+                            <AlertTriangle className="h-4 w-4 sm:h-6 sm:w-6 text-red-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">错误数</p>
-                            <p className="text-2xl font-bold">{formatNumber(workersData.totalErrors)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">错误数</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(workersData.totalErrors)}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-green-500/10">
-                            <Shield className="h-6 w-6 text-green-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-green-500/10 flex-shrink-0">
+                            <Shield className="h-4 w-4 sm:h-6 sm:w-6 text-green-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">成功率</p>
-                            <p className="text-2xl font-bold">
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">成功率</p>
+                            <p className="text-lg sm:text-2xl font-bold">
                               {workersData.totalRequests > 0 
                                 ? ((1 - workersData.totalErrors / workersData.totalRequests) * 100).toFixed(2) 
                                 : 100}%
@@ -488,31 +505,31 @@ export function Dashboard() {
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-blue-500/10">
-                            <Code className="h-6 w-6 text-blue-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-blue-500/10 flex-shrink-0">
+                            <Code className="h-4 w-4 sm:h-6 sm:w-6 text-blue-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">Workers 数量</p>
-                            <p className="text-2xl font-bold">
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">Workers 数量</p>
+                            <p className="text-lg sm:text-2xl font-bold">
                               {workersData.accounts.reduce((sum, a) => sum + a.workers.length, 0)}
                             </p>
                           </div>
                         </CardContent>
                       </Card>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {workersData.accounts.flatMap((account) =>
                         account.workers.map((worker) => (
                           <Card key={`${account.account}-${worker.scriptName}`}>
-                            <CardHeader className="pb-2">
-                              <CardTitle className="flex items-center gap-2 text-base">
-                                <Code className="h-4 w-4 text-cloudflare-orange" />
-                                {worker.scriptName}
+                            <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+                              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                                <Code className="h-4 w-4 text-cloudflare-orange flex-shrink-0" />
+                                <span className="truncate">{worker.scriptName}</span>
                               </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                              <div className="space-y-2 text-sm">
+                            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                              <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">请求数</span>
                                   <span className="font-medium">{formatNumber(worker.requests)}</span>
@@ -564,52 +581,52 @@ export function Dashboard() {
                 )}
                 {!eoLoading && hasEoData && eoOverview && (
                   <section>
-                    <div className="mb-4 flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-edgeone-blue" />
-                      <h2 className="text-lg font-semibold">EdgeOne 概览 (24h)</h2>
+                    <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                      <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-edgeone-blue" />
+                      <h2 className="text-sm sm:text-lg font-semibold">EdgeOne 概览 (24h)</h2>
                     </div>
-                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-4 sm:mb-6">
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-blue-500/10">
-                            <Database className="h-6 w-6 text-blue-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-blue-500/10 flex-shrink-0">
+                            <Database className="h-4 w-4 sm:h-6 sm:w-6 text-blue-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">总流量</p>
-                            <p className="text-2xl font-bold">{formatBytes(eoOverview.totalFlux)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">总流量</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatBytes(eoOverview.totalFlux)}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-green-500/10">
-                            <Activity className="h-6 w-6 text-green-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-green-500/10 flex-shrink-0">
+                            <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-green-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">总请求</p>
-                            <p className="text-2xl font-bold">{formatNumber(eoOverview.totalRequests)}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-purple-500/10">
-                            <Code className="h-6 w-6 text-purple-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">边缘函数请求</p>
-                            <p className="text-2xl font-bold">{formatNumber(eoEdgeFunctions?.totalRequests || 0)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">总请求</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(eoOverview.totalRequests)}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-orange-500/10">
-                            <Activity className="h-6 w-6 text-orange-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-purple-500/10 flex-shrink-0">
+                            <Code className="h-4 w-4 sm:h-6 sm:w-6 text-purple-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">边缘函数 CPU</p>
-                            <p className="text-2xl font-bold">{formatNumber(eoEdgeFunctions?.totalCpuTime || 0)} ms</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">边缘函数请求</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(eoEdgeFunctions?.totalRequests || 0)}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-orange-500/10 flex-shrink-0">
+                            <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-orange-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">边缘函数 CPU</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(eoEdgeFunctions?.totalCpuTime || 0)} ms</p>
                           </div>
                         </CardContent>
                       </Card>
@@ -717,52 +734,52 @@ export function Dashboard() {
                   <>
                   {/* ESA Stats Cards */}
                   <section>
-                    <div className="mb-4 flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-emerald-500" />
-                      <h2 className="text-lg font-semibold">ESA 概览 (24h)</h2>
+                    <div className="mb-3 sm:mb-4 flex items-center gap-2">
+                      <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+                      <h2 className="text-sm sm:text-lg font-semibold">ESA 概览 (24h)</h2>
                     </div>
-                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-6">
+                    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4 mb-4 sm:mb-6">
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-emerald-500/10">
-                            <Shield className="h-6 w-6 text-emerald-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-emerald-500/10 flex-shrink-0">
+                            <Shield className="h-4 w-4 sm:h-6 sm:w-6 text-emerald-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">站点数</p>
-                            <p className="text-2xl font-bold">{esaData?.accounts.reduce((sum, a) => sum + (a.sites?.length || 0), 0) || 0}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">站点数</p>
+                            <p className="text-lg sm:text-2xl font-bold">{esaData?.accounts.reduce((sum, a) => sum + (a.sites?.length || 0), 0) || 0}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-blue-500/10">
-                            <Activity className="h-6 w-6 text-blue-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-blue-500/10 flex-shrink-0">
+                            <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-blue-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">总请求</p>
-                            <p className="text-2xl font-bold">{formatNumber(esaSummary.totalRequests)}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-cyan-500/10">
-                            <Database className="h-6 w-6 text-cyan-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">总流量</p>
-                            <p className="text-2xl font-bold">{formatBytes(esaSummary.totalBytes)}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">总请求</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatNumber(esaSummary.totalRequests)}</p>
                           </div>
                         </CardContent>
                       </Card>
                       <Card>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="rounded-full p-3 bg-purple-500/10">
-                            <Code className="h-6 w-6 text-purple-500" />
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-cyan-500/10 flex-shrink-0">
+                            <Database className="h-4 w-4 sm:h-6 sm:w-6 text-cyan-500" />
                           </div>
-                          <div>
-                            <p className="text-sm text-muted-foreground">边缘函数</p>
-                            <p className="text-2xl font-bold">{esaData?.accounts.reduce((sum, a) => sum + (a.routineCount || 0), 0) || 0}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">总流量</p>
+                            <p className="text-lg sm:text-2xl font-bold truncate">{formatBytes(esaSummary.totalBytes)}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="flex items-center gap-2.5 sm:gap-4 p-3 sm:p-6">
+                          <div className="rounded-full p-2 sm:p-3 bg-purple-500/10 flex-shrink-0">
+                            <Code className="h-4 w-4 sm:h-6 sm:w-6 text-purple-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs sm:text-sm text-muted-foreground">边缘函数</p>
+                            <p className="text-lg sm:text-2xl font-bold">{esaData?.accounts.reduce((sum, a) => sum + (a.routineCount || 0), 0) || 0}</p>
                           </div>
                         </CardContent>
                       </Card>
@@ -1243,35 +1260,18 @@ export function Dashboard() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t py-6">
-        <div className="container flex flex-col items-center gap-4 px-4 text-center text-sm text-muted-foreground">
-          <p>{t("poweredBy")} Cloudflare GraphQL Analytics API, Tencent Cloud EdgeOne API & Aliyun ESA API</p>
-          <div className="flex gap-4 flex-wrap justify-center">
-            <a
-              href="https://developers.cloudflare.com/analytics/graphql-api/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground"
-            >
-              Cloudflare Docs
-            </a>
-            <a
-              href="https://cloud.tencent.com/document/product/1552"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground"
-            >
-              EdgeOne Docs
-            </a>
-            <a
-              href="https://help.aliyun.com/zh/edge-security-acceleration/esa/api-esa-2024-09-10-overview"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-foreground"
-            >
-              Aliyun ESA Docs
-            </a>
+      {/* Footer - Claude 风格极简底部 */}
+      <footer className="border-t border-border/40 mt-12">
+        <div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-xs text-muted-foreground">
+              {t("poweredBy")} Cloudflare · EdgeOne · Aliyun ESA
+            </p>
+            <div className="flex gap-5 text-xs">
+              <a href="https://developers.cloudflare.com/analytics/graphql-api/" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">Cloudflare</a>
+              <a href="https://cloud.tencent.com/document/product/1552" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">EdgeOne</a>
+              <a href="https://help.aliyun.com/zh/edge-security-acceleration/esa/api-esa-2024-09-10-overview" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">ESA</a>
+            </div>
           </div>
         </div>
       </footer>

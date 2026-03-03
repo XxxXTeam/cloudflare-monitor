@@ -9,6 +9,11 @@ export interface CFZone {
   contentTypes?: { name: string; bytes: number; requests: number }[];
   sslVersions?: { name: string; requests: number }[];
   httpVersions?: { name: string; requests: number }[];
+  httpMethods?: { name: string; requests: number }[];
+  threatTypes?: { name: string; requests: number }[];
+  ipClasses?: { name: string; requests: number }[];
+  firewallEvents?: CFFirewallEvent[];
+  dnsQueries?: CFDnsQueryData[];
   error?: string;
 }
 
@@ -22,6 +27,12 @@ export interface CFDayData {
     threats: number;
     cachedRequests: number;
     cachedBytes: number;
+    pageViews?: number;
+    encryptedBytes?: number;
+    encryptedRequests?: number;
+  };
+  uniq?: {
+    uniques: number;
   };
 }
 
@@ -35,6 +46,12 @@ export interface CFHourData {
     threats: number;
     cachedRequests: number;
     cachedBytes: number;
+    pageViews?: number;
+    encryptedBytes?: number;
+    encryptedRequests?: number;
+  };
+  uniq?: {
+    uniques: number;
   };
 }
 
@@ -212,6 +229,44 @@ export interface ESAAccount {
 
 export interface ESAData {
   accounts: ESAAccount[];
+}
+
+/*
+CFFirewallEvent Cloudflare 防火墙事件数据
+@field action 防火墙动作（block/challenge/jschallenge 等）
+@field requests 请求数
+@field source 规则来源（waf/firewall_rules/rate_limit 等）
+*/
+export interface CFFirewallEvent {
+  action: string;
+  requests: number;
+  source?: string;
+  country?: string;
+  clientIP?: string;
+  host?: string;
+  path?: string;
+  ruleId?: string;
+}
+
+/*
+CFDnsQueryData Cloudflare DNS 查询统计数据
+@field queryName 查询域名
+@field queryType 查询类型（A/AAAA/CNAME 等）
+@field count 查询次数
+@field responseCode 响应码
+*/
+export interface CFDnsQueryData {
+  queryName?: string;
+  queryType?: string;
+  count: number;
+  responseCode?: string;
+  dimensions?: {
+    queryName?: string;
+    queryType?: string;
+    responseCode?: string;
+    date?: string;
+    datetime?: string;
+  };
 }
 
 // CF Workers quota

@@ -119,7 +119,11 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
             orderBy: [date_DESC]
           ) {
             dimensions { date }
-            sum { requests bytes threats cachedRequests cachedBytes }
+            sum {
+              requests bytes threats cachedRequests cachedBytes
+              pageViews encryptedBytes encryptedRequests
+            }
+            uniq { uniques }
           }
         }
       }
@@ -135,7 +139,11 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
             orderBy: [datetime_DESC]
           ) {
             dimensions { datetime }
-            sum { requests bytes threats cachedRequests cachedBytes }
+            sum {
+              requests bytes threats cachedRequests cachedBytes
+              pageViews encryptedBytes encryptedRequests
+            }
+            uniq { uniques }
           }
         }
       }
@@ -175,6 +183,9 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
               clientHTTPVersionMap { requests clientHTTPProtocol }
               responseStatusMap { requests edgeResponseStatus }
               contentTypeMap { bytes requests edgeResponseContentTypeName }
+              clientRequestHTTPMethodMap { requests clientRequestHTTPMethodName }
+              threatPathingMap { requests threatPathingName }
+              ipClassMap { requests ipType }
             }
           }
         }
@@ -231,6 +242,9 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       contentTypes: unknown[];
       sslVersions: unknown[];
       httpVersions: unknown[];
+      httpMethods: unknown[];
+      threatTypes: unknown[];
+      ipClasses: unknown[];
       error?: string;
     } = {
       domain,
@@ -242,6 +256,9 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       contentTypes: [],
       sslVersions: [],
       httpVersions: [],
+      httpMethods: [],
+      threatTypes: [],
+      ipClasses: [],
     };
 
     // Process days data
@@ -331,11 +348,39 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
         });
       });
 
+      /* 解析 HTTP 请求方法分布 */
+      const httpMethodStats: Record<string, { name: string; requests: number }> = {};
+      /* 解析威胁类型分布 */
+      const threatPathStats: Record<string, { name: string; requests: number }> = {};
+      /* 解析 IP 分类分布 */
+      const ipClassStats: Record<string, { name: string; requests: number }> = {};
+
+      rawClientData.forEach((record: any) => {
+        record.sum?.clientRequestHTTPMethodMap?.forEach((m: any) => {
+          const name = m.clientRequestHTTPMethodName || "Unknown";
+          if (!httpMethodStats[name]) httpMethodStats[name] = { name, requests: 0 };
+          httpMethodStats[name].requests += m.requests || 0;
+        });
+        record.sum?.threatPathingMap?.forEach((t: any) => {
+          const name = t.threatPathingName || "Unknown";
+          if (!threatPathStats[name]) threatPathStats[name] = { name, requests: 0 };
+          threatPathStats[name].requests += t.requests || 0;
+        });
+        record.sum?.ipClassMap?.forEach((ip: any) => {
+          const name = ip.ipType || "Unknown";
+          if (!ipClassStats[name]) ipClassStats[name] = { name, requests: 0 };
+          ipClassStats[name].requests += ip.requests || 0;
+        });
+      });
+
       zoneData.browsers = Object.values(browserStats).sort((a, b) => b.pageViews - a.pageViews).slice(0, 10);
       zoneData.statusCodes = Object.values(statusCodeStats).sort((a, b) => b.requests - a.requests).slice(0, 10);
       zoneData.contentTypes = Object.values(contentTypeStats).sort((a, b) => b.bytes - a.bytes).slice(0, 10);
       zoneData.sslVersions = Object.values(sslStats).sort((a, b) => b.requests - a.requests);
       zoneData.httpVersions = Object.values(httpStats).sort((a, b) => b.requests - a.requests);
+      zoneData.httpMethods = Object.values(httpMethodStats).sort((a, b) => b.requests - a.requests);
+      zoneData.threatTypes = Object.values(threatPathStats).sort((a, b) => b.requests - a.requests).slice(0, 10);
+      zoneData.ipClasses = Object.values(ipClassStats).sort((a, b) => b.requests - a.requests);
     }
 
     return zoneData;
@@ -351,6 +396,9 @@ async function fetchZoneData(headers: Record<string, string>, zoneId: string, do
       contentTypes: [],
       sslVersions: [],
       httpVersions: [],
+      httpMethods: [],
+      threatTypes: [],
+      ipClasses: [],
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
